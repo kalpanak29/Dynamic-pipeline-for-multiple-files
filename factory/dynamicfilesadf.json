@@ -1,0 +1,9 @@
+{
+	"name": "dynamicfilesadf",
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "6a62ad61-a219-454d-a9f5-498ac0968c19",
+		"tenantId": "d054ec41-416e-448d-ac9a-2f4046c9b3b2"
+	}
+}

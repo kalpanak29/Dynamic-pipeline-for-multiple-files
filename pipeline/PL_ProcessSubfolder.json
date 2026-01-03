@@ -1,0 +1,113 @@
+{
+	"name": "PL_ProcessSubfolder",
+	"properties": {
+		"activities": [
+			{
+				"name": "GM_ListFilesInSubfolder",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_Folder_Metadata",
+						"type": "DatasetReference",
+						"parameters": {
+							"FolderPath": {
+								"value": "@pipeline().parameters.SubfolderName",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "FOREACH_FilesInSubfolders",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GM_ListFilesInSubfolder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GM_ListFilesInSubfolder').output.childItems",
+						"type": "Expression"
+					},
+					"batchCount": 4,
+					"activities": [
+						{
+							"name": "Exec_ProcessSingleFile",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_ProcessSingleFile",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"FileName": {
+										"value": "@item().name",
+										"type": "Expression"
+									},
+									"FolderPath": {
+										"value": "@pipeline().parameters.SubfolderName",
+										"type": "Expression"
+									},
+									"EmailRecipient": {
+										"value": "@pipeline().parameters.EmailRecipient",
+										"type": "Expression"
+									},
+									"ContainerName": {
+										"value": "@pipeline().parameters.ContainerName",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"SubfolderName": {
+				"type": "string"
+			},
+			"EmailRecipient": {
+				"type": "string"
+			},
+			"ContainerName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-01-03T09:21:44Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

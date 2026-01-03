@@ -1,0 +1,222 @@
+{
+	"name": "PL_ProcessSingleFile",
+	"properties": {
+		"activities": [
+			{
+				"name": "ValidateData",
+				"type": "AzureFunctionActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"functionName": "ValidateData",
+					"body": {
+						"value": "{\n    \"fileName\": \"@{pipeline().parameters.FileName}\",\n    \"folderPath\": \"@{pipeline().parameters.FolderPath}\",\n    \"action\": \"validate\"\n}",
+						"type": "Expression"
+					},
+					"method": "POST"
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureFunction_LS",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "IF_IsDataMessy",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "ValidateData",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('ValidateData').output.isMessy, true)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "COPY_CleanData",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "Parameterized_New_Source_DS",
+									"type": "DatasetReference",
+									"parameters": {
+										"ContainerName": {
+											"value": "@pipeline().parameters.ContainerName",
+											"type": "Expression"
+										},
+										"FolderPath": {
+											"value": "@pipeline().parameters.FolderPath",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@pipeline().parameters.FileName",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Parameterized_destination_dataset",
+									"type": "DatasetReference",
+									"parameters": {
+										"ContainerName": "staging-data",
+										"FolderPath": {
+											"value": "@pipeline().parameters.FolderPath",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@pipeline().parameters.FileName",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "SendEmail",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "POST",
+								"headers": {
+									"\"Content-Type\"": "\"application/json\""
+								},
+								"url": "https://prod-35.eastus.logic.azure.com:443/workflows/95f3aa39b7424866be9010308cd47c33/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=l4jT8f35yG0yDjEXy6kSeYEBK-_-2sv7LSf8KG8zXIY",
+								"body": {
+									"to": "@{pipeline().parameters.EmailRecipient}",
+									"subject": "Messy Data Alert - @{pipeline().parameters.FileName}",
+									"body": "Messy data detected!\n\nFile: @{pipeline().parameters.FileName}\nFolder: @{pipeline().parameters.FolderPath}\n\nMessy Rows:\n@{activity('AF_ValidateData').output.messyRows}"
+								}
+							}
+						},
+						{
+							"name": "LS-Azure Function",
+							"type": "AzureFunctionActivity",
+							"dependsOn": [
+								{
+									"activity": "SendEmail",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"functionName": "CleanData",
+								"body": {
+									"fileName": "@{pipeline().parameters.FileName}",
+									"folderPath": "@{pipeline().parameters.FolderPath}",
+									"action": "clean"
+								},
+								"method": "POST"
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureFunction_LS",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"FileName": {
+				"type": "string"
+			},
+			"FolderPath": {
+				"type": "string"
+			},
+			"EmailRecipient": {
+				"type": "string"
+			},
+			"ContainerName": {
+				"type": "string",
+				"defaultValue": "raw-data"
+			}
+		},
+		"variables": {
+			"ValidationResult": {
+				"type": "String"
+			},
+			"MessyRows": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-01-03T09:21:44Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,147 @@
+{
+	"name": "ProcessMessyData_Master",
+	"properties": {
+		"activities": [
+			{
+				"name": "FOREACH_StandaloneFiles",
+				"type": "ForEach",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.StandaloneFiles",
+						"type": "Expression"
+					},
+					"batchCount": 2,
+					"activities": [
+						{
+							"name": "EXEC_ProcessStandaloneFile",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_ProcessSingleFile",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"FileName": {
+										"value": "@item()",
+										"type": "Expression"
+									},
+									"EmailRecipient": {
+										"value": "@pipeline().parameters.EmailRecipient",
+										"type": "Expression"
+									},
+									"ContainerName": {
+										"value": "@pipeline().parameters.ContainerName",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "ForEachSubfolders",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "FOREACH_StandaloneFiles",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.Subfolders",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Exec_ProcessSubfolder",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_ProcessSubfolder",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SubfolderName": {
+										"value": "@item()",
+										"type": "Expression"
+									},
+									"EmailRecipient": {
+										"value": "@pipeline().parameters.EmailRecipient",
+										"type": "Expression"
+									},
+									"ContainerName": {
+										"value": "@pipeline().parameters.ContainerName",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"ContainerName": {
+				"type": "string",
+				"defaultValue": "raw-data"
+			},
+			"StandaloneFiles": {
+				"type": "array",
+				"defaultValue": [
+					"employees.csv",
+					"products.csv"
+				]
+			},
+			"Subfolders": {
+				"type": "array",
+				"defaultValue": [
+					"subfolder1",
+					"subfolder2"
+				]
+			},
+			"EmailRecipient": {
+				"type": "string",
+				"defaultValue": "kskothawade@gmail.com"
+			}
+		},
+		"variables": {
+			"MessyDataDetails": {
+				"type": "Array",
+				"defaultValue": []
+			},
+			"CurrentFileName": {
+				"type": "String"
+			},
+			"CurrentFolderName": {
+				"type": "String"
+			},
+			"IsDataMessy": {
+				"type": "Boolean",
+				"defaultValue": false
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-01-03T09:21:45Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
