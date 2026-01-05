@@ -32,7 +32,7 @@
 				"type": "IfCondition",
 				"dependsOn": [
 					{
-						"activity": "ValidateData",
+						"activity": "SET_MessyRowDetails",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -41,7 +41,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@equals(activity('ValidateData').output.isMessy, true)",
+						"value": "@equals(variables('IsMessy'), true)",
 						"type": "Expression"
 					},
 					"ifFalseActivities": [
@@ -151,7 +151,7 @@
 								"body": {
 									"to": "@{pipeline().parameters.EmailRecipient}",
 									"subject": "Messy Data Alert - @{pipeline().parameters.FileName}",
-									"body": "Messy data detected!\n\nFile: @{pipeline().parameters.FileName}\nFolder: @{pipeline().parameters.FolderPath}\n\nMessy Rows:\n@{activity('AF_ValidateData').output.messyRows}"
+									"body": "Messy data found!\n\nFile: @{pipeline().parameters.FileName}\nFolder: @{pipeline().parameters.FolderPath}\n\nDetails: @{variables('MessyRowDetails')}"
 								}
 							}
 						},
@@ -190,6 +190,54 @@
 						}
 					]
 				}
+			},
+			{
+				"name": "SET_IsMessy",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "ValidateData",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "IsMessy",
+					"value": {
+						"value": "@activity('ValidateData').output.isMessy",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "SET_MessyRowDetails",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "SET_IsMessy",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "MessyRowsDetails",
+					"value": {
+						"value": "@string(activity('ValidateData').output)",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"parameters": {
@@ -208,11 +256,15 @@
 			}
 		},
 		"variables": {
-			"ValidationResult": {
+			"ValidationOutput": {
 				"type": "String"
 			},
-			"MessyRows": {
+			"MessyRowsDetails": {
 				"type": "String"
+			},
+			"IsMessy": {
+				"type": "Boolean",
+				"defaultValue": false
 			}
 		},
 		"annotations": [],
