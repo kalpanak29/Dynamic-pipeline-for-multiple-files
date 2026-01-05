@@ -1,0 +1,754 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "dynamicfilesadf"
+		},
+		"AzureBlobStorage1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureBlobStorage1'"
+		},
+		"AzureFunction_LS_functionKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'functionKey' of 'AzureFunction_LS'"
+		},
+		"AzureFunction_LS_properties_typeProperties_functionAppUrl": {
+			"type": "string",
+			"defaultValue": "https://dynamicmultiple.azurewebsites.net"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureBlobStorage1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureBlobStorage1_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureFunction_LS')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureFunction",
+				"typeProperties": {
+					"functionAppUrl": "[parameters('AzureFunction_LS_properties_typeProperties_functionAppUrl')]",
+					"authentication": "Anonymous",
+					"functionKey": {
+						"type": "SecureString",
+						"value": "[parameters('AzureFunction_LS_functionKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_Folder_Metadata')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureBlobStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FolderPath": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@dataset().FolderPath",
+							"type": "Expression"
+						},
+						"container": "raw-data"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureBlobStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Parameterized_New_Source_DS')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureBlobStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"ContainerName": {
+						"type": "string"
+					},
+					"FolderPath": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().FileName",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().FolderPath",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().ContainerName",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureBlobStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Parameterized_destination_dataset')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureBlobStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"ContainerName": {
+						"type": "string"
+					},
+					"FolderPath": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().FileName",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().FolderPath",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().ContainerName",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureBlobStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_ProcessSingleFile')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "ValidateData",
+						"type": "AzureFunctionActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"functionName": "ValidateData",
+							"body": {
+								"value": "{\n    \"fileName\": \"@{pipeline().parameters.FileName}\",\n    \"folderPath\": \"@{pipeline().parameters.FolderPath}\",\n    \"action\": \"validate\"\n}",
+								"type": "Expression"
+							},
+							"headers": {},
+							"method": "POST"
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureFunction_LS",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "IF_IsDataMessy",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "SET_MessyRowDetails",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(variables('IsMessy'), true)",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "COPY_CleanData",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "Parameterized_New_Source_DS",
+											"type": "DatasetReference",
+											"parameters": {
+												"ContainerName": {
+													"value": "@pipeline().parameters.ContainerName",
+													"type": "Expression"
+												},
+												"FolderPath": {
+													"value": "@pipeline().parameters.FolderPath",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "Parameterized_destination_dataset",
+											"type": "DatasetReference",
+											"parameters": {
+												"ContainerName": "staging-data",
+												"FolderPath": {
+													"value": "@pipeline().parameters.FolderPath",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "SendEmail",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"method": "POST",
+										"headers": {
+											"\"Content-Type\"": "\"application/json\""
+										},
+										"url": "https://prod-35.eastus.logic.azure.com:443/workflows/95f3aa39b7424866be9010308cd47c33/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=l4jT8f35yG0yDjEXy6kSeYEBK-_-2sv7LSf8KG8zXIY",
+										"body": {
+											"to": "@{pipeline().parameters.EmailRecipient}",
+											"subject": "Messy Data Alert - @{pipeline().parameters.FileName}",
+											"body": "Messy data found!\n\nFile: @{pipeline().parameters.FileName}\nFolder: @{pipeline().parameters.FolderPath}\n\nDetails: @{variables('MessyRowDetails')}"
+										}
+									}
+								},
+								{
+									"name": "LS-Azure Function",
+									"type": "AzureFunctionActivity",
+									"dependsOn": [
+										{
+											"activity": "SendEmail",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"functionName": "CleanData",
+										"body": {
+											"fileName": "@{pipeline().parameters.FileName}",
+											"folderPath": "@{pipeline().parameters.FolderPath}",
+											"action": "clean"
+										},
+										"headers": {},
+										"method": "POST"
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureFunction_LS",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "SET_IsMessy",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "ValidateData",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IsMessy",
+							"value": {
+								"value": "@activity('ValidateData').output.isMessy",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "SET_MessyRowDetails",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "SET_IsMessy",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MessyRowsDetails",
+							"value": {
+								"value": "@string(activity('ValidateData').output)",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"FileName": {
+						"type": "string"
+					},
+					"FolderPath": {
+						"type": "string"
+					},
+					"EmailRecipient": {
+						"type": "string"
+					},
+					"ContainerName": {
+						"type": "string",
+						"defaultValue": "raw-data"
+					}
+				},
+				"variables": {
+					"ValidationOutput": {
+						"type": "String"
+					},
+					"MessyRowsDetails": {
+						"type": "String"
+					},
+					"IsMessy": {
+						"type": "Boolean",
+						"defaultValue": false
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-01-03T09:21:44Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureFunction_LS')]",
+				"[concat(variables('factoryId'), '/datasets/Parameterized_New_Source_DS')]",
+				"[concat(variables('factoryId'), '/datasets/Parameterized_destination_dataset')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_ProcessSubfolder')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "GM_ListFilesInSubfolder",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_Folder_Metadata",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderPath": {
+										"value": "@pipeline().parameters.SubfolderName",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "DelimitedTextReadSettings"
+							}
+						}
+					},
+					{
+						"name": "FOREACH_FilesInSubfolders",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "GM_ListFilesInSubfolder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('GM_ListFilesInSubfolder').output.childItems",
+								"type": "Expression"
+							},
+							"batchCount": 4,
+							"activities": [
+								{
+									"name": "Exec_ProcessSingleFile",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"policy": {
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_ProcessSingleFile",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"FileName": {
+												"value": "@item().name",
+												"type": "Expression"
+											},
+											"FolderPath": {
+												"value": "@pipeline().parameters.SubfolderName",
+												"type": "Expression"
+											},
+											"EmailRecipient": {
+												"value": "@pipeline().parameters.EmailRecipient",
+												"type": "Expression"
+											},
+											"ContainerName": {
+												"value": "@pipeline().parameters.ContainerName",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"SubfolderName": {
+						"type": "string"
+					},
+					"EmailRecipient": {
+						"type": "string"
+					},
+					"ContainerName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-01-03T09:21:44Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Folder_Metadata')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_ProcessSingleFile')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ProcessMessyData_Master')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "FOREACH_StandaloneFiles",
+						"type": "ForEach",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.StandaloneFiles",
+								"type": "Expression"
+							},
+							"batchCount": 2,
+							"activities": [
+								{
+									"name": "EXEC_ProcessStandaloneFile",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"policy": {
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_ProcessSingleFile",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"FileName": {
+												"value": "@item()",
+												"type": "Expression"
+											},
+											"EmailRecipient": {
+												"value": "@pipeline().parameters.EmailRecipient",
+												"type": "Expression"
+											},
+											"ContainerName": {
+												"value": "@pipeline().parameters.ContainerName",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "ForEachSubfolders",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "FOREACH_StandaloneFiles",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.Subfolders",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Exec_ProcessSubfolder",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"policy": {
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_ProcessSubfolder",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"SubfolderName": {
+												"value": "@item()",
+												"type": "Expression"
+											},
+											"EmailRecipient": {
+												"value": "@pipeline().parameters.EmailRecipient",
+												"type": "Expression"
+											},
+											"ContainerName": {
+												"value": "@pipeline().parameters.ContainerName",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"ContainerName": {
+						"type": "string",
+						"defaultValue": "raw-data"
+					},
+					"StandaloneFiles": {
+						"type": "array",
+						"defaultValue": [
+							"employees.csv",
+							"products.csv"
+						]
+					},
+					"Subfolders": {
+						"type": "array",
+						"defaultValue": [
+							"subfolder1",
+							"subfolder2"
+						]
+					},
+					"EmailRecipient": {
+						"type": "string",
+						"defaultValue": "kskothawade@gmail.com"
+					}
+				},
+				"variables": {
+					"MessyDataDetails": {
+						"type": "Array",
+						"defaultValue": []
+					},
+					"CurrentFileName": {
+						"type": "String"
+					},
+					"CurrentFolderName": {
+						"type": "String"
+					},
+					"IsDataMessy": {
+						"type": "Boolean",
+						"defaultValue": false
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-01-03T09:21:45Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_ProcessSingleFile')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_ProcessSubfolder')]"
+			]
+		}
+	]
+}
